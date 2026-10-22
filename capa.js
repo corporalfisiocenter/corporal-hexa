@@ -1,4 +1,4 @@
-/* Capa Córporal para Hexa · v1.0 (22-oct-2026)
+/* Capa Córporal para Hexa · v1.0.1 (22-oct-2026) · enlaces e imágenes solo https
    Solo añade estilo y contenido; NO toca enlaces ni formularios de reserva.
    Si algo falla (o Cloudflare/Google no responden), Hexa se queda como siempre. */
 (function () {
@@ -66,6 +66,7 @@ body a.crp-btn.crp-btn-no,body button.crp-btn.crp-btn-no{background:#fff!importa
     var st = document.createElement('style'); st.id = 'crpCapa'; st.textContent = css; document.head.appendChild(st);
     var $ = function (s, c) { return (c || document).querySelector(s); }, $$ = function (s, c) { return [].slice.call((c || document).querySelectorAll(s)); };
     var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+    var url = function (u) { u = String(u || ''); return /^https:\/\//i.test(u) ? u : ''; }; // solo enlaces https (nunca javascript:)
     $$('.btn-success.btn-lg br').forEach(function (b) { b.replaceWith(' '); });
 
     // Tarjetas de clase (elegir clase, reservado y Mis clases): mismo enlace, solo se reordena el texto
@@ -125,7 +126,7 @@ body a.crp-btn.crp-btn-no,body button.crp-btn.crp-btn-no{background:#fff!importa
         sec.innerHTML = '<h2>Próximas actividades en Córporal <a href="https://www.corporalfisiocenter.com/flow" target="_blank">Ver todas</a></h2><div class="crp-rail">' +
           acts.map(function (a) {
             var w = a.restantes === 0 ? 'Completa · lista de espera' : (a.restantes <= 5 ? '¡Quedan ' + a.restantes + ' plazas!' : '');
-            return '<a class="crp-card" target="_blank" href="' + esc(a.enlace) + '">' + (a.imagen ? '<img loading="lazy" alt="" src="' + esc(a.imagen) + '">' : '') +
+            return '<a class="crp-card" target="_blank" href="' + esc(url(a.enlace)) + '">' + (a.imagen ? '<img loading="lazy" alt="" src="' + esc(url(a.imagen)) + '">' : '') +
               '<div class="b"><div class="t">' + esc(a.tipo) + '</div><div class="h">' + esc(a.titulo) + '</div><div class="m">' + esc(f(a)) + ' · ' + esc(pr(a)) + '</div>' + (w ? '<div class="w">' + w + '</div>' : '') + '</div></a>';
           }).join('') + '</div>';
         var box = $('.site-login') || $('.wrap>.container'); box.appendChild(sec);
