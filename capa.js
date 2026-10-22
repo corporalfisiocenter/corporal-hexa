@@ -1,12 +1,13 @@
-/* Capa Córporal para Hexa · v1.0.1 (22-oct-2026) · enlaces e imágenes solo https
-   Solo añade estilo y contenido; NO toca enlaces ni formularios de reserva.
-   Si algo falla (o Cloudflare/Google no responden), Hexa se queda como siempre. */
+/* Capa Córporal para Hexa · v1.1 (22-oct-2026) · revisión de seguridad
+   Solo añade estilo y contenido en las pantallas de alumnas (r=clases/...); no toca enlaces ni formularios de reserva.
+   No envía datos personales a ningún sitio. Si algo falla (GitHub/Google no responden), Hexa se queda como siempre. */
 (function () {
   if (window.__crpCapa) return; window.__crpCapa = 1;
   var FLOW = 'https://script.google.com/macros/s/AKfycbxJywXAqbZxteXn4i-pU0g98VNQyN-tyGPaNk1Ox32Jvl_7BYC72ZBBEEaSUHG-P1Pxaw/exec?action=flow';
   var DEMO = false;
   try {
     var r = (new URLSearchParams(location.search).get('r') || 'clases/index').replace('%2F', '/');
+    if (!/^clases(\/|$)/.test(r)) return; // solo pantallas de alumnas, nunca otras zonas de Hexa
     var css = `
 #crpCapa,.crp *{box-sizing:border-box}
 html body{background:#f4f4f4!important;color:#575656;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
@@ -66,7 +67,10 @@ body a.crp-btn.crp-btn-no,body button.crp-btn.crp-btn-no{background:#fff!importa
     var st = document.createElement('style'); st.id = 'crpCapa'; st.textContent = css; document.head.appendChild(st);
     var $ = function (s, c) { return (c || document).querySelector(s); }, $$ = function (s, c) { return [].slice.call((c || document).querySelectorAll(s)); };
     var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
-    var url = function (u) { u = String(u || ''); return /^https:\/\//i.test(u) ? u : ''; }; // solo enlaces https (nunca javascript:)
+    // Solo dominios de Córporal: un enlace o imagen de otro sitio metido en el Sheet no se muestra
+    var OK_LINK = /^https:\/\/(www\.)?corporalfisiocenter\.com(\/|$)/i;
+    var OK_IMG = /^https:\/\/(empresas-assets\.pablothielen\.workers\.dev|pub-1a705c41b41b4a418d2cdadd86fda757\.r2\.dev|images\.squarespace-cdn\.com|(www\.)?corporalfisiocenter\.com)\//i;
+    var url = function (u, re) { u = String(u || '').trim(); return re.test(u) ? u : ''; };
     $$('.btn-success.btn-lg br').forEach(function (b) { b.replaceWith(' '); });
 
     // Tarjetas de clase (elegir clase, reservado y Mis clases): mismo enlace, solo se reordena el texto
@@ -75,11 +79,14 @@ body a.crp-btn.crp-btn-no,body button.crp-btn.crp-btn-no{background:#fff!importa
       var col = a.style.backgroundColor || (a.parentNode && a.parentNode.style.backgroundColor) || '';
       if (col) a.style.setProperty('--crpc', col);
       var ps = $$('p', a), h4 = $('h4', a);
-      if (h4) {
+      if (h4 && !$('a,button,form,input,select', a)) {
         var v = {}; ps.forEach(function (p) { var m = p.innerText.match(/^\s*([^:]+):\s*([\s\S]*)$/); if (m) v[m[1].trim().toLowerCase()] = m[2].replace(/\s+/g, ' ').trim(); });
         var nom = h4.textContent.replace(/^\s*Clase:\s*/i, '').trim();
-        var fe = (v.fecha || '').replace(/-\d{4}$/, '').replace('-', '/');
-        a.innerHTML = '<p class="crp-h">' + esc(fe) + (v.horario ? ' · ' + esc(v.horario) : '') + '</p><p class="crp-n">' + esc(nom) + '</p><p class="crp-h">' + esc([v.centro, v.fisioterapeuta].filter(Boolean).join(' · ')) + '</p>';
+        var fe = (v.fecha || ''), fm = fe.match(/^(\D*?)(\d{1,2})-(\d{1,2})-\d{4}$/); if (fm) fe = fm[1] + fm[2] + '/' + fm[3];
+        var usados = ['fecha', 'horario', 'centro', 'fisioterapeuta'];
+        var extra = ps.filter(function (p) { var m = p.innerText.match(/^\s*([^:]+):/); return !m || usados.indexOf(m[1].trim().toLowerCase()) < 0; })
+          .map(function (p) { return '<p class="crp-h">' + esc(p.innerText.trim()) + '</p>'; }).join('');
+        a.innerHTML = '<p class="crp-h">' + esc(fe) + (v.horario ? ' · ' + esc(v.horario) : '') + '</p><p class="crp-n">' + esc(nom) + '</p><p class="crp-h">' + esc([v.centro, v.fisioterapeuta].filter(Boolean).join(' · ')) + '</p>' + extra;
       } else if (ps.length >= 3) {
         ps[0].className = 'crp-h'; ps[0].textContent = ps[0].textContent.replace(/^Horario:\s*/i, '');
         ps[1].className = 'crp-n'; ps[1].textContent = ps[1].textContent.replace(/\s*!\s*$/, '');
@@ -88,17 +95,19 @@ body a.crp-btn.crp-btn-no,body button.crp-btn.crp-btn-no{background:#fff!importa
     });
     // Pantalla «Apuntado/a!»
     if (r === 'clases/apuntado') {
-      var h = $('h1'); if (h) h.innerHTML = '<span class="crp-ok">✓</span>¡Reserva hecha!<br><span style="font-size:15px;font-weight:400;color:#808285">Te esperamos en clase</span>';
+      var h = $('h1'); // solo si Hexa confirma la reserva (no en «completa», «ya estás», errores…)
+      if (h && /apuntad/i.test(h.textContent) && !/espera|complet|ya est|error|no /i.test(h.textContent) && !$('.alert-danger,.alert-warning')) h.innerHTML = '<span class="crp-ok">✓</span>¡Reserva hecha!<br><span style="font-size:15px;font-weight:400;color:#808285">Te esperamos en clase</span>';
       $$('a.btn-success').forEach(function (b) { b.classList.add('crp-btn'); });
     }
 
     // Anular clase (r=clases/eliminar): confirmación y «borrado correctamente»
     if (r === 'clases/eliminar') {
-      var ok = $('.alert-success'), h = $('h1');
-      if (ok) {
+      var ok = $('.alert-success'), h = $('h1'), aviso = $('.alert-danger,.alert-warning');
+      if (aviso) { /* error de Hexa: se deja su título y su mensaje tal cual */ }
+      else if (ok) {
         if (h) h.innerHTML = '<span class="crp-ok">✓</span>Clase anulada';
         var x = $('.close', ok); if (x) x.remove(); ok.classList.add('crp-alert');
-      } else if (h) { h.textContent = '¿Anular esta clase?'; }
+      } else if (h && /borrarme/i.test(h.textContent)) { h.textContent = '¿Anular esta clase?'; }
       $$('.btn-success,.btn-danger,.btn-primary').forEach(function (b) { b.classList.add('crp-btn'); if (b.classList.contains('btn-danger')) b.classList.add('crp-btn-no'); });
     }
     // Elegir centro: direcciones
@@ -120,14 +129,16 @@ body a.crp-btn.crp-btn-no,body button.crp-btn.crp-btn-no{background:#fff!importa
       var ctl = new AbortController(); setTimeout(function () { ctl.abort(); }, 6000);
       fetch(FLOW, { signal: ctl.signal }).then(function (x) { return x.json(); }).then(function (j) {
         var acts = (j && j.actividades || []).slice(0, 6); if (!acts.length) return;
-        var f = function (a) { var d = new Date(a.inicio); return d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' }) + ' · ' + a.hora_inicio + ' h'; };
+        var f = function (a) { var d = new Date(a.inicio); return (isNaN(d) ? '' : d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' }) + ' · ') + (a.hora_inicio ? a.hora_inicio + ' h' : ''); };
         var pr = function (a) { return /^\d+$/.test(a.precio) ? a.precio + ' €' : a.precio; };
         var sec = document.createElement('div'); sec.className = 'crp-sec crp';
-        sec.innerHTML = '<h2>Próximas actividades en Córporal <a href="https://www.corporalfisiocenter.com/flow" target="_blank">Ver todas</a></h2><div class="crp-rail">' +
+        sec.innerHTML = '<h2>Próximas actividades en Córporal <a href="https://www.corporalfisiocenter.com/flow" target="_blank" rel="noopener">Ver todas</a></h2><div class="crp-rail">' +
           acts.map(function (a) {
-            var w = a.restantes === 0 ? 'Completa · lista de espera' : (a.restantes <= 5 ? '¡Quedan ' + a.restantes + ' plazas!' : '');
-            return '<a class="crp-card" target="_blank" href="' + esc(url(a.enlace)) + '">' + (a.imagen ? '<img loading="lazy" alt="" src="' + esc(url(a.imagen)) + '">' : '') +
-              '<div class="b"><div class="t">' + esc(a.tipo) + '</div><div class="h">' + esc(a.titulo) + '</div><div class="m">' + esc(f(a)) + ' · ' + esc(pr(a)) + '</div>' + (w ? '<div class="w">' + w + '</div>' : '') + '</div></a>';
+            var n = (a.restantes === '' || a.restantes == null) ? NaN : Number(a.restantes);
+            var w = n === 0 ? 'Completa · lista de espera' : (n > 0 && n <= 5 ? '¡Quedan ' + n + ' plazas!' : '');
+            var href = url(a.enlace, OK_LINK), img = url(a.imagen, OK_IMG);
+            return (href ? '<a class="crp-card" target="_blank" rel="noopener" href="' + esc(href) + '">' : '<div class="crp-card">') + (img ? '<img loading="lazy" alt="" src="' + esc(img) + '">' : '') +
+              '<div class="b"><div class="t">' + esc(a.tipo) + '</div><div class="h">' + esc(a.titulo) + '</div><div class="m">' + esc(f(a)) + ' · ' + esc(pr(a)) + '</div>' + (w ? '<div class="w">' + esc(w) + '</div>' : '') + '</div>' + (href ? '</a>' : '</div>');
           }).join('') + '</div>';
         var box = $('.site-login') || $('.wrap>.container'); box.appendChild(sec);
       }).catch(function () {});
